@@ -1,6 +1,5 @@
-# bazel-verilog-test
-
-![build](https://github.com/filmil/bazel-verilog-test/actions/workflows/build.yml/badge.svg)
+# bazel-verilog-test ![build](https://github.com/filmil/bazel-verilog-test/actions/workflows/build.yml/badge.svg)
+> Automated builds are executed on each PR, and once a week even if no code changed the week prior.
 
 Testing verilog build rules from https://github.com/hdl/bazel_rules_hdl
 

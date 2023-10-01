@@ -4,6 +4,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: "47 5 * * 1"
 
 jobs:
   test:
@@ -12,7 +14,7 @@ jobs:
       - name: Setup bazel
         uses: abhinavsingh/setup-bazel@v3
         with:
-          version: 5.1.0
+          version: 5.4.0
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build
