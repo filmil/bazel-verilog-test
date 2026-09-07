@@ -2,6 +2,7 @@
 
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@rules_verilator//verilator:defs.bzl", "verilator_cc_library")
 load("@rules_verilog//verilog:defs.bzl", "verilog_library")
 
@@ -28,6 +29,78 @@ cc_test(
     srcs = ["counter_test.cc"],
     deps = [
         ":counter_verilator",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# Synthesis. Yosys comes from the Bazel Central Registry, so no tool has to be
+# installed. `tools` rather than `srcs` is what gives the genrule the yosys
+# runfiles, which carry abc and the techlib share tree it reads at run time.
+genrule(
+    name = "counter_synth",
+    srcs = ["counter.v"],
+    outs = [
+        "counter_synth.v",
+        "counter_stat.txt",
+    ],
+    cmd = " ".join([
+        "$(execpath @yosys//:yosys) -q",
+        "-p 'read_verilog $(execpath counter.v)'",
+        "-p 'hierarchy -check -top counter'",
+        "-p 'synth -top counter'",
+        "-p 'write_verilog -noattr $(execpath counter_synth.v)'",
+        "-p 'tee -o $(execpath counter_stat.txt) stat'",
+    ]),
+    tools = ["@yosys"],
+)
+
+# Checks the synthesized result rather than the synthesis log. The count is
+# asserted against every flip flop flavour yosys might pick, so a change of
+# cell naming in a later yosys release does not turn this red on its own.
+sh_test(
+    name = "counter_synth_test",
+    size = "small",
+    srcs = ["counter_synth_test.sh"],
+    args = [
+        "$(rootpath :counter_synth.v)",
+        "$(rootpath :counter_stat.txt)",
+    ],
+    data = [
+        ":counter_stat.txt",
+        ":counter_synth.v",
+    ],
+)
+
+# Post synthesis simulation. Yosys writes plain Verilog, so the netlist can be
+# verilated the same way the source is, and driven by the same test. This is
+# the check that matters: if synthesis changes what the design does, the
+# assertions fail, and it does not depend on which cells yosys picked.
+verilog_library(
+    name = "counter_netlist",
+    srcs = [":counter_synth.v"],
+    top_module = "counter",
+)
+
+verilator_cc_library(
+    name = "counter_netlist_verilator",
+    module = ":counter_netlist",
+    # Two lint classes that only ever fire on machine written Verilog. The
+    # module is called counter while the file is counter_synth.v, and yosys
+    # leaves whole-width temporaries of which only some bits are read. Neither
+    # is waived for the hand written source above.
+    vopts = [
+        "-Wall",
+        "-Wno-DECLFILENAME",
+        "-Wno-UNUSEDSIGNAL",
+    ],
+)
+
+cc_test(
+    name = "counter_netlist_test",
+    size = "small",
+    srcs = ["counter_test.cc"],
+    deps = [
+        ":counter_netlist_verilator",
         "@googletest//:gtest_main",
     ],
 )
