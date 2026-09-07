@@ -1,134 +1,69 @@
-# bazel-verilog-test ![build](https://github.com/filmil/bazel-verilog-test/actions/workflows/build.yml/badge.svg)
-> Automated builds are executed on each PR, and once a week even if no code
-> changed the week prior.
+# bazel-verilog-test
 
-Testing verilog build rules from https://github.com/hdl/bazel_rules_hdl
+[![Build](https://github.com/filmil/bazel-verilog-test/actions/workflows/build.yml/badge.svg)](https://github.com/filmil/bazel-verilog-test/actions/workflows/build.yml)
 
-This is the answer to the question posed at:
-https://github.com/hdl/bazel_rules_hdl/issues/123
+A small worked example of building and testing Verilog with Bazel, using
+rules that come from the Bazel Central Registry.
+
+The design is a 128 bit counter in `counter.v`.
+`rules_verilog` describes it as a `verilog_library`, `rules_verilator`
+verilates it into a C++ model, and a `cc_test` drives that model and checks
+that it resets and counts.
+
+## Building
+
+```bash
+bazel build //...
+bazel test //...
+```
+
+The Bazel version is pinned in `.bazelversion`, so install `bazelisk` under
+the name `bazel` and the right version is fetched for you.
+Nothing else needs to be installed.
+Verilator, its runtime, and the C++ test framework are all fetched and built
+by Bazel.
+
+## What the build contains
+
+```
+verilog_library(name = "counter")       # the RTL, from rules_verilog
+verilator_cc_library(name = "counter_verilator")  # the C++ model, from rules_verilator
+cc_test(name = "counter_test")          # drives the model
+```
+
+`counter_test.cc` holds the design in reset across a rising edge, checks the
+count is zero, then clocks it and checks it advances by one each time.
+The test was checked against a deliberate break: changing the increment in
+`counter.v` from one to two makes it fail.
+
+## History
+
+This repository used to depend on
+[bazel_rules_hdl](https://github.com/hdl/bazel_rules_hdl), pinned by git
+commit through a `WORKSPACE` file, and it ran synthesis and place and route
+through Yosys and OpenROAD.
+That was written before those rules were available any other way, and it
+answered a question raised in
+[bazel_rules_hdl#123](https://github.com/hdl/bazel_rules_hdl/issues/123).
+
+Two things changed since.
+Verilog and Verilator rules are now published in the Bazel Central Registry,
+so a project can name them as ordinary `bazel_dep` entries and get a pinned,
+versioned release.
+`bazel_rules_hdl` is still not published in any registry, so using it means
+pinning a commit and repeating each of its own overrides in the consuming
+module, because Bazel applies an override only from the root module.
+
+So this example now uses `rules_verilog` and `rules_verilator` from the
+registry.
+The build no longer compiles OpenROAD and Yosys, which is why it finishes in
+minutes rather than hours.
+
+Synthesis and place and route are not covered here any more.
+For those, `bazel_rules_hdl` is still the place to look.
 
 ## Troubleshooting
 
-I intend to keep this repository in working order. If something does not work,
-[file a bug][fb].
+If something does not work, [file a bug][fb].
 
 [fb]: https://github.com/filmil/bazel-verilog-test/issues
-
-## Prerequisites
-
-This is a prep-work checklist to be able to compile the code in this repo with
-success. I hope you will find it quite modest.
-
-### Bazelisk
-
-Download and install `bazelisk` (not `bazel`) following the [instructions][bii].
-
-[bii]: https://github.com/bazelbuild/bazelisk#installation
-
-When you download the appropriate version for your system, place it somewhere
-in your `$PATH`, and name it `bazel`.  This will give you a command-for-command
-compatible `bazel` binary, with the added bonus that it will download the exact
-`bazel` binary version that each project needs.  This is of big help when dealing
-with various projects that use bazel.
-
-> I recommend using `bazelisk` instead of `bazel` wherever you can, and installing
-> it under the binary name `bazel` in your `$PATH`, *always*.
-
-
-From here on I will assume that you did as advised in the prerequisites.
-
-## Doing things
-
-Now that you installed the needed tools, we can try some examples out.  `bazel`
-will download any needed libraries the first time you run it, so give it some
-time.
-
-### Clone this repository
-
-```bash
-git clone https://github.com/filmil/bazel-verilog-test
-cd bazel-verilog-test  # to go to the directory you just cloned
-```
-
-### Build the example
-
-```bash
-bazel build //:counter_place_and_route
-```
-
-After a considerable amount of time spent in downloading and compiling the
-prerequisites, you should have your placed and routed design.
-
-## What needed resolving
-
-Somewhat surprisingly, the `bazel_rules_hdl` repository does *not* show a functional
-example of using the repository rules. The example given in the README.md is
-not only incorrect, but also incomplete. Substantial additions are needed to go
-from that example to this repository. See the list below.
-
-This is a short list of things that needed resolving to get this working repo
-up and running. With all of that fixed, I was able to build the sample basic
-design without errors.
-
-* The repository rules at https://github.com/hdl/bazel_rules_hdl are sensitive
-  to bazel version.  This has to do with the backwards incompatible evolution of
-  `@bazel_tools` but also the approaches the prerequisite deps are taking to
-  bazel compilation.  I tried to fix the HDL rules at top of tree, but could not
-  do that easily. To resolve this issue, I added `.bazelversion` at the project
-  root and pegged the bazel version needed.
-
-* This, in turn, means that the best way to compile this repository is by using
-  `bazelisk`. `bazelisk` will read `.bazelversion` and automatically download and
-  apply the appropriate bazel version to your repository.
-
-* The README.md in the `bazel_rules_hdl` repository is lacking a sample working
-  set of `git hash` and `sha_256`, and has no clear instruction to choose a
-  working set.  It is also offering a syntactically incorrect `WORKSPACE` example,
-  which one should also work around.
-
-* The WORKSPACE file example in the repository is also lacking some needed
-  declarations. I supplanted those based on the `WORKSPACE` file in
-  `bazel_rules_hdl`, and the observations given in
-  https://github.com/hdl/bazel_rules_hdl/issues/123.
-
-* The repository is not complete with a set of carefully placed `.bazelrc`
-  directives.  This is not mentioned in `README.md`, but is required for the
-  build to work. At minimum, the dependency code requires C++17 or higher, which
-  you don't get by default.
-
-* I added a hermetic python interpreter configuration to the `WORKSPACE` file,
-  so you don't need to worry about having the correct python interpreter for the
-  project.
-
-## Example output
-
-This is what my computer printed when I built the example counter. Compilation
-was quick because I already spent a long time compiling the prerequisites, and
-this was at least the second time I ran it.  The first time around, your output
-will be significantly more wordy.
-
-```bash
-$ bazel build //:counter_place_and_route
-INFO: Analyzed target //:counter_place_and_route (23 packages loaded, 10985 targets configured).
-INFO: Found 1 target...
-Target //:counter_place_and_route up-to-date:
-  bazel-bin/counter_place_and_route_detail_routed.def
-  bazel-bin/counter_place_and_route__detailed_routing.db
-  bazel-bin/counter_place_and_route__floorplan.log
-  bazel-bin/counter_place_and_route__place_pins.log
-  bazel-bin/counter_place_and_route__pdn_generation.log
-  bazel-bin/counter_place_and_route__global_placement.log
-  bazel-bin/counter_place_and_route__resizing.log
-  bazel-bin/counter_place_and_route__clock_tree_synthesis.log
-  bazel-bin/counter_place_and_route__global_routing.log
-  bazel-bin/counter_place_and_route__detailed_routing.log
-  bazel-bin/counter_place_and_route_verilog_based_power_results.textproto
-  bazel-bin/counter_place_and_route_verilog_based_area_results.textproto
-  bazel-bin/counter_place_and_route_general_routing_power_results.textproto
-  bazel-bin/counter_place_and_route_general_routing_area_results.textproto
-  bazel-bin/counter_place_and_route_commands.tcl
-INFO: Elapsed time: 4.611s, Critical Path: 0.09s
-INFO: 1 process: 1 internal.
-INFO: Build completed successfully, 1 total action
-```
-

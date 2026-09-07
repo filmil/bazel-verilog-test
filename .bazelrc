@@ -1,3 +1,7 @@
-build --cxxopt "-std=c++17"
-build --host_cxxopt "-std=c++17"
-build --crosstool_top=@llvm_toolchain//:toolchain
+# My registry first, then the BCR. `common` and not `build`, so that
+# `bazel mod` and `bazel query` resolve the same way the build does.
+common \
+  --registry=https://raw.githubusercontent.com/filmil/bazel-registry/main \
+  --registry=https://bcr.bazel.build
+
+try-import %workspace%/user.bazelrc

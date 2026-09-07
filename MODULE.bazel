@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+module(
+    name = "bazel_verilog_test",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_verilog", version = "1.4.3")
+bazel_dep(name = "rules_verilator", version = "1.1.2")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1")
+
+bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4", dev_dependency = True)
